@@ -19,7 +19,7 @@ fn main() {
                 let path = request_parts[1];
                 println!("Request: {}", path);
                 if path != "/" {
-                    _stream.write(b"HTTP/1.1 404 NOT FOUND\r\n\r\n").unwrap();
+                    _stream.write(b"HTTP/1.1 404 Not Found\r\n\r\n").unwrap();
                     continue;
                 } else {
                     _stream.write(b"HTTP/1.1 200 OK\r\n\r\n").unwrap();
