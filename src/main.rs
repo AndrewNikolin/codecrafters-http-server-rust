@@ -13,7 +13,7 @@ fn main() {
                 _stream.read(&mut buffer).unwrap();
                 let request = parse_request(&buffer);
 
-                let response = match request.path_parts.first().unwrap().as_str() {
+                let response = match request.path_parts.first().unwrap_or(&String::new()).as_str() {
                     "echo" => echo(request),
                     "" => Response {
                         status_code: 200,
