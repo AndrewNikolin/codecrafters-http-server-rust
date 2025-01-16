@@ -75,26 +75,17 @@ fn echo(request: Request) -> Response {
 fn parse_request(buf: &[u8; 1024]) -> Request {
     let request = String::from_utf8_lossy(buf);
 
-    let request = request.trim().split("\r\n").next().unwrap();
-    let request_parts: Vec<&str> = request.split_whitespace().collect();
+    let request = request.trim().split("\r\n").filter(|s| !s.trim().is_empty()).collect::<Vec<&str>>();
+    let request_line = request[0].split(" ").collect::<Vec<&str>>();
+    let method = request_line[0].to_string();
+    let path = request_line[1].to_string();
+    let path_parts = path.split("/").map(|s| s.to_string()).filter(|s| !s.is_empty()).collect();
 
-    let method = request_parts[0].to_string();
-
-    let path = request_parts[1].to_string().trim().to_string();
-    let path_parts = path
-        .split("/")
-        .map(|s| s.to_string())
-        .filter(|s| s != "")
-        .collect();
-
-    let headers: Vec<(String, String)> = request
-        .split("\r\n")
-        .skip(1)
+    let headers = request[1..request.len()-1]
+        .iter()
         .map(|line| {
-            let mut parts = line.split(": ");
-            let key = parts.next().unwrap().to_string();
-            let value = parts.next().unwrap().to_string();
-            (key, value)
+            let parts = line.split(": ").collect::<Vec<&str>>();
+            (parts[0].to_string(), parts[1].to_string())
         })
         .collect();
 
