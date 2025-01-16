@@ -14,6 +14,7 @@ fn main() {
                 let request = parse_request(&buffer);
 
                 let response = match request.path_parts.first().unwrap_or(&String::new()).as_str() {
+                    "user-agent" => user_agent(request),
                     "echo" => echo(request),
                     "" => Response {
                         status_code: 200,
@@ -36,6 +37,25 @@ fn main() {
                 println!("error: {}", e);
             }
         }
+    }
+}
+
+fn user_agent(request: Request) -> Response {
+    let user_agent = request
+        .headers
+        .iter()
+        .find(|(key, _)| key.to_lowercase() == "user-agent")
+        .map(|(_, value)| value)
+        .unwrap_or(&"unknown".to_string());
+
+    let content_length = user_agent.len();
+    let content_type_header = ("Content-Type".to_string(), "text/plain".to_string());
+    let content_length_header = ("Content-Length".to_string(), content_length.to_string());
+    Response {
+        status_code: 200,
+        status_text: "OK".to_string(),
+        headers: vec![content_type_header, content_length_header],
+        body: user_agent.as_bytes().to_vec(),
     }
 }
 
@@ -66,10 +86,22 @@ fn parse_request(buf: &[u8; 1024]) -> Request {
         .filter(|s| s != "")
         .collect();
 
+    let headers: Vec<(String, String)> = request
+        .split("\r\n")
+        .skip(1)
+        .map(|line| {
+            let mut parts = line.split(": ");
+            let key = parts.next().unwrap().to_string();
+            let value = parts.next().unwrap().to_string();
+            (key, value)
+        })
+        .collect();
+
     Request {
         method,
         path: path.clone(),
         path_parts,
+        headers,
     }
 }
 
@@ -77,6 +109,7 @@ struct Request {
     method: String,
     path: String,
     path_parts: Vec<String>,
+    headers: Vec<(String, String)>,
 }
 
 struct Response {
