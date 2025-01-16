@@ -41,12 +41,13 @@ fn main() {
 }
 
 fn user_agent(request: Request) -> Response {
+    let unknown = &"unknown".to_string();
     let user_agent = request
         .headers
         .iter()
         .find(|(key, _)| key.to_lowercase() == "user-agent")
         .map(|(_, value)| value)
-        .unwrap_or(&"unknown".to_string());
+        .unwrap_or(unknown);
 
     let content_length = user_agent.len();
     let content_type_header = ("Content-Type".to_string(), "text/plain".to_string());
