@@ -27,7 +27,7 @@ fn main() {
 fn handle_connection(mut stream: TcpStream) {
     println!("accepted new connection");
     let mut buffer = [0; 1024];
-    stream.read(&mut buffer).unwrap();
+    _ = stream.read(&mut buffer).unwrap();
     let request = parse_request(&buffer);
 
     let response = match request
@@ -54,7 +54,7 @@ fn handle_connection(mut stream: TcpStream) {
     };
 
     let response_bytes = response.to_bytes();
-    stream.write(&response_bytes).unwrap();
+    _ = stream.write(&response_bytes).unwrap();
 }
 
 fn user_agent(request: Request) -> Response {
