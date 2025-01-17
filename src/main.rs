@@ -5,7 +5,14 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::net::TcpStream;
 
+static mut DIRECTORY: &str = "public";
 fn main() {
+    let params: Vec<String> = std::env::args().collect();
+    if params.len() > 2 {
+        let directory = params[2].clone();
+        unsafe { DIRECTORY = Box::leak(Box::new(directory)); }
+    }
+
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
     let thread_pool = threadpool::ThreadPool::new(5);
 
@@ -31,6 +38,7 @@ fn handle_connection(mut stream: TcpStream) {
     {
         "user-agent" => user_agent(request),
         "echo" => echo(request),
+        "files" => file(request),
         "" => Response {
             status_code: 200,
             status_text: "OK".to_string(),
@@ -78,6 +86,32 @@ fn echo(request: Request) -> Response {
         status_text: "OK".to_string(),
         headers: vec![content_type_header, content_length_header],
         body: request.path_parts[1].as_bytes().to_vec(),
+    }
+}
+
+fn file(request: Request) -> Response {
+    let path = format!("{}/{}", unsafe { DIRECTORY }, request.path_parts.last().unwrap());
+    println!("Serving file: {}", path);
+    let content = std::fs::read(path);
+
+    match content {
+        Ok(content) => {
+            let content_length = content.len();
+            let content_type_header = ("Content-Type".to_string(), "application/octet-stream".to_string());
+            let content_length_header = ("Content-Length".to_string(), content_length.to_string());
+            Response {
+                status_code: 200,
+                status_text: "OK".to_string(),
+                headers: vec![content_type_header, content_length_header],
+                body: content,
+            }
+        },
+        Err(_) => Response {
+            status_code: 404,
+            status_text: "Not Found".to_string(),
+            headers: vec![],
+            body: vec![],
+        }
     }
 }
 
