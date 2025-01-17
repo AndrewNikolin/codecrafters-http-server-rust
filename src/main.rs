@@ -5,7 +5,7 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::net::TcpStream;
 
-static mut DIRECTORY: &str = "public";
+static mut DIRECTORY: &str = "/Users/andriinikolin";
 fn main() {
     let params: Vec<String> = std::env::args().collect();
     if params.len() > 2 {
@@ -100,10 +100,10 @@ fn files(request: Request) -> Response {
 fn files_post(request: Request) -> Response {
     let path = format!("{}/{}", unsafe { DIRECTORY }, request.path_parts.last().unwrap());
     println!("Writing file: {}", path);
-    
+
     let mut file = std::fs::File::create(path).unwrap();
     _ = file.write(&request.body).unwrap();
- 
+
     Response {
         status_code: 201,
         status_text: "Created".to_string(),
@@ -163,13 +163,16 @@ fn parse_request(buf: &[u8; 1024]) -> Request {
             (parts[0].to_string(), parts[1].to_string())
         })
         .collect();
-    
-    let body = request[1..]
+
+    let mut body: Vec<_> = request[1..]
         .iter()
         .filter(|line| !line.contains(": "))
         .flat_map(|line| line.as_bytes())
         .copied()
         .collect();
+    while body.last() == Some(&0) {
+        body.pop();
+    }
 
     Request {
         method,
