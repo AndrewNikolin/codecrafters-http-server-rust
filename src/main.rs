@@ -1,43 +1,52 @@
+mod threadpool;
+
 use std::io::{Read, Write};
 #[allow(unused_imports)]
 use std::net::TcpListener;
+use std::net::TcpStream;
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
+    let thread_pool = threadpool::ThreadPool::new(5);
 
     for stream in listener.incoming() {
-        match stream {
-            Ok(mut _stream) => {
-                println!("accepted new connection");
-                let mut buffer = [0; 1024];
-                _stream.read(&mut buffer).unwrap();
-                let request = parse_request(&buffer);
-
-                let response = match request.path_parts.first().unwrap_or(&String::new()).as_str() {
-                    "user-agent" => user_agent(request),
-                    "echo" => echo(request),
-                    "" => Response {
-                        status_code: 200,
-                        status_text: "OK".to_string(),
-                        headers: vec![],
-                        body: b"Hello, World!".to_vec(),
-                    },
-                    _ => Response {
-                        status_code: 404,
-                        status_text: "Not Found".to_string(),
-                        headers: vec![],
-                        body: vec![],
-                    },
-                };
-
-                let response_bytes = response.to_bytes();
-                _stream.write(&response_bytes).unwrap();
-            }
-            Err(e) => {
-                println!("error: {}", e);
-            }
-        }
+        let stream = stream.unwrap();
+        thread_pool.execute(|| {
+            handle_connection(stream);
+        });
     }
+}
+
+fn handle_connection(mut stream: TcpStream) {
+    println!("accepted new connection");
+    let mut buffer = [0; 1024];
+    stream.read(&mut buffer).unwrap();
+    let request = parse_request(&buffer);
+
+    let response = match request
+        .path_parts
+        .first()
+        .unwrap_or(&String::new())
+        .as_str()
+    {
+        "user-agent" => user_agent(request),
+        "echo" => echo(request),
+        "" => Response {
+            status_code: 200,
+            status_text: "OK".to_string(),
+            headers: vec![],
+            body: b"Hello, World!".to_vec(),
+        },
+        _ => Response {
+            status_code: 404,
+            status_text: "Not Found".to_string(),
+            headers: vec![],
+            body: vec![],
+        },
+    };
+
+    let response_bytes = response.to_bytes();
+    stream.write(&response_bytes).unwrap();
 }
 
 fn user_agent(request: Request) -> Response {
@@ -75,13 +84,21 @@ fn echo(request: Request) -> Response {
 fn parse_request(buf: &[u8; 1024]) -> Request {
     let request = String::from_utf8_lossy(buf);
 
-    let request = request.trim().split("\r\n").filter(|s| !s.trim().is_empty()).collect::<Vec<&str>>();
+    let request = request
+        .trim()
+        .split("\r\n")
+        .filter(|s| !s.trim().is_empty())
+        .collect::<Vec<&str>>();
     let request_line = request[0].split(" ").collect::<Vec<&str>>();
     let method = request_line[0].to_string();
     let path = request_line[1].to_string();
-    let path_parts = path.split("/").map(|s| s.to_string()).filter(|s| !s.is_empty()).collect();
+    let path_parts = path
+        .split("/")
+        .map(|s| s.to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
 
-    let headers = request[1..request.len()-1]
+    let headers = request[1..request.len() - 1]
         .iter()
         .map(|line| {
             let parts = line.split(": ").collect::<Vec<&str>>();
