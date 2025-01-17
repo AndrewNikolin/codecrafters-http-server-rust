@@ -38,7 +38,7 @@ fn handle_connection(mut stream: TcpStream) {
     {
         "user-agent" => user_agent(request),
         "echo" => echo(request),
-        "files" => file(request),
+        "files" => files(request),
         "" => Response {
             status_code: 200,
             status_text: "OK".to_string(),
@@ -89,7 +89,30 @@ fn echo(request: Request) -> Response {
     }
 }
 
-fn file(request: Request) -> Response {
+fn files(request: Request) -> Response {
+    match request.method.as_str() {
+        "GET" => files_get(request),
+        "POST" => files_post(request),
+        _ => panic!("Unsupported method"),
+    }
+}
+
+fn files_post(request: Request) -> Response {
+    let path = format!("{}/{}", unsafe { DIRECTORY }, request.path_parts.last().unwrap());
+    println!("Writing file: {}", path);
+    
+    let mut file = std::fs::File::create(path).unwrap();
+    _ = file.write(&request.body).unwrap();
+ 
+    Response {
+        status_code: 201,
+        status_text: "Created".to_string(),
+        headers: vec![],
+        body: vec![],
+    }
+}
+
+fn files_get(request: Request) -> Response {
     let path = format!("{}/{}", unsafe { DIRECTORY }, request.path_parts.last().unwrap());
     println!("Serving file: {}", path);
     let content = std::fs::read(path);
@@ -132,12 +155,20 @@ fn parse_request(buf: &[u8; 1024]) -> Request {
         .filter(|s| !s.is_empty())
         .collect();
 
-    let headers = request[1..request.len() - 1]
+    let headers = request[1..]
         .iter()
+        .filter(|line| line.contains(": "))
         .map(|line| {
             let parts = line.split(": ").collect::<Vec<&str>>();
             (parts[0].to_string(), parts[1].to_string())
         })
+        .collect();
+    
+    let body = request[1..]
+        .iter()
+        .filter(|line| !line.contains(": "))
+        .flat_map(|line| line.as_bytes())
+        .copied()
         .collect();
 
     Request {
@@ -145,6 +176,7 @@ fn parse_request(buf: &[u8; 1024]) -> Request {
         path: path.clone(),
         path_parts,
         headers,
+        body,
     }
 }
 
@@ -153,6 +185,7 @@ struct Request {
     path: String,
     path_parts: Vec<String>,
     headers: Vec<(String, String)>,
+    body: Vec<u8>,
 }
 
 struct Response {
