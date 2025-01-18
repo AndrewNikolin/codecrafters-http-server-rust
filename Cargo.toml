@@ -9,4 +9,5 @@ rust-version = "1.80"
 anyhow = "1.0.68"                                # error handling
 bytes = "1.3.0"                                  # helps manage buffers
 thiserror = "1.0.38"
-log = "0.4.25"                             # error handling
+log = "0.4.25"
+flate2 = "1.0.35"                             # error handling

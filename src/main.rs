@@ -73,6 +73,24 @@ fn handle_connection(mut stream: TcpStream) {
             response
                 .headers
                 .push(("Content-Encoding".to_string(), "gzip".to_string()));
+            let mut encoder =
+                flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+            _ = encoder.write_all(&response.body).unwrap();
+            response.body = encoder.finish().unwrap();
+
+            let content_length = response.body.len();
+
+            if let Some((_, content_length_header)) = response
+                .headers
+                .iter_mut()
+                .find(|(key, _)| key.to_lowercase() == "Content-Length".to_lowercase())
+            {
+                *content_length_header = content_length.to_string();
+            } else {
+                response
+                    .headers
+                    .push(("Content-Length".to_string(), content_length.to_string()));
+            }
         }
     }
 
