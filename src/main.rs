@@ -5,12 +5,14 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::net::TcpStream;
 
-static mut DIRECTORY: &str = "/Users/andriinikolin";
+static mut DIRECTORY: &str = "public";
 fn main() {
     let params: Vec<String> = std::env::args().collect();
     if params.len() > 2 {
         let directory = params[2].clone();
-        unsafe { DIRECTORY = Box::leak(Box::new(directory)); }
+        unsafe {
+            DIRECTORY = Box::leak(Box::new(directory));
+        }
     }
 
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
@@ -52,17 +54,25 @@ fn handle_connection(mut stream: TcpStream) {
             body: vec![],
         },
     };
-    
-    if request.headers.iter().any(|(key, _)| key.to_lowercase() == "Accept-Encoding".to_lowercase()) {
+
+    if request
+        .headers
+        .iter()
+        .any(|(key, _)| key.to_lowercase() == "Accept-Encoding".to_lowercase())
+    {
         let accepted_encodings = request
             .headers
             .iter()
-            .find(|(key, _)| key.to_lowercase() == "Accept-Encoding")
-            .map(|(_, value)| value)
-            .unwrap();
-        
-        if accepted_encodings.contains("gzip") {
-            response.headers.push(("Content-Encoding".to_string(), "gzip".to_string()));
+            .find(|(key, _)| key.to_lowercase() == "Accept-Encoding".to_lowercase())
+            .unwrap()
+            .1
+            .split(", ")
+            .collect::<Vec<&str>>();
+
+        if accepted_encodings.contains(&"gzip") {
+            response
+                .headers
+                .push(("Content-Encoding".to_string(), "gzip".to_string()));
         }
     }
 
@@ -111,7 +121,11 @@ fn files(request: &Request) -> Response {
 }
 
 fn files_post(request: &Request) -> Response {
-    let path = format!("{}/{}", unsafe { DIRECTORY }, request.path_parts.last().unwrap());
+    let path = format!(
+        "{}/{}",
+        unsafe { DIRECTORY },
+        request.path_parts.last().unwrap()
+    );
     println!("Writing file: {}", path);
 
     let mut file = std::fs::File::create(path).unwrap();
@@ -126,14 +140,21 @@ fn files_post(request: &Request) -> Response {
 }
 
 fn files_get(request: &Request) -> Response {
-    let path = format!("{}/{}", unsafe { DIRECTORY }, request.path_parts.last().unwrap());
+    let path = format!(
+        "{}/{}",
+        unsafe { DIRECTORY },
+        request.path_parts.last().unwrap()
+    );
     println!("Serving file: {}", path);
     let content = std::fs::read(path);
 
     match content {
         Ok(content) => {
             let content_length = content.len();
-            let content_type_header = ("Content-Type".to_string(), "application/octet-stream".to_string());
+            let content_type_header = (
+                "Content-Type".to_string(),
+                "application/octet-stream".to_string(),
+            );
             let content_length_header = ("Content-Length".to_string(), content_length.to_string());
             Response {
                 status_code: 200,
@@ -141,13 +162,13 @@ fn files_get(request: &Request) -> Response {
                 headers: vec![content_type_header, content_length_header],
                 body: content,
             }
-        },
+        }
         Err(_) => Response {
             status_code: 404,
             status_text: "Not Found".to_string(),
             headers: vec![],
             body: vec![],
-        }
+        },
     }
 }
 
