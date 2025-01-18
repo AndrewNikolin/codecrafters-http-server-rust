@@ -30,15 +30,15 @@ fn handle_connection(mut stream: TcpStream) {
     _ = stream.read(&mut buffer).unwrap();
     let request = parse_request(&buffer);
 
-    let response = match request
+    let mut response = match request
         .path_parts
         .first()
         .unwrap_or(&String::new())
         .as_str()
     {
-        "user-agent" => user_agent(request),
-        "echo" => echo(request),
-        "files" => files(request),
+        "user-agent" => user_agent(&request),
+        "echo" => echo(&request),
+        "files" => files(&request),
         "" => Response {
             status_code: 200,
             status_text: "OK".to_string(),
@@ -52,12 +52,25 @@ fn handle_connection(mut stream: TcpStream) {
             body: vec![],
         },
     };
+    
+    if request.headers.iter().any(|(key, _)| key.to_lowercase() == "Accept-Encoding".to_lowercase()) {
+        let accepted_encodings = request
+            .headers
+            .iter()
+            .find(|(key, _)| key.to_lowercase() == "Accept-Encoding")
+            .map(|(_, value)| value)
+            .unwrap();
+        
+        if accepted_encodings.contains("gzip") {
+            response.headers.push(("Content-Encoding".to_string(), "gzip".to_string()));
+        }
+    }
 
     let response_bytes = response.to_bytes();
     _ = stream.write(&response_bytes).unwrap();
 }
 
-fn user_agent(request: Request) -> Response {
+fn user_agent(request: &Request) -> Response {
     let unknown = &"unknown".to_string();
     let user_agent = request
         .headers
@@ -77,7 +90,7 @@ fn user_agent(request: Request) -> Response {
     }
 }
 
-fn echo(request: Request) -> Response {
+fn echo(request: &Request) -> Response {
     let content_length = request.path_parts[1].len();
     let content_type_header = ("Content-Type".to_string(), "text/plain".to_string());
     let content_length_header = ("Content-Length".to_string(), content_length.to_string());
@@ -89,7 +102,7 @@ fn echo(request: Request) -> Response {
     }
 }
 
-fn files(request: Request) -> Response {
+fn files(request: &Request) -> Response {
     match request.method.as_str() {
         "GET" => files_get(request),
         "POST" => files_post(request),
@@ -97,7 +110,7 @@ fn files(request: Request) -> Response {
     }
 }
 
-fn files_post(request: Request) -> Response {
+fn files_post(request: &Request) -> Response {
     let path = format!("{}/{}", unsafe { DIRECTORY }, request.path_parts.last().unwrap());
     println!("Writing file: {}", path);
 
@@ -112,7 +125,7 @@ fn files_post(request: Request) -> Response {
     }
 }
 
-fn files_get(request: Request) -> Response {
+fn files_get(request: &Request) -> Response {
     let path = format!("{}/{}", unsafe { DIRECTORY }, request.path_parts.last().unwrap());
     println!("Serving file: {}", path);
     let content = std::fs::read(path);
