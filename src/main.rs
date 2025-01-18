@@ -258,7 +258,8 @@ impl Response {
             response.push_str(&format!("{}: {}\r\n", key, value));
         }
         response.push_str("\r\n");
-        response.push_str(&String::from_utf8_lossy(&self.body));
-        response.into_bytes()
+        let mut bytes = response.into_bytes();
+        bytes.extend(&self.body);
+        bytes
     }
 }
