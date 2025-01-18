@@ -75,10 +75,9 @@ fn handle_connection(mut stream: TcpStream) {
                 .push(("Content-Encoding".to_string(), "gzip".to_string()));
             let mut encoder =
                 flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
-            encoder.write_all(&response.body).unwrap();
-            // hex encoded gzip file
-            let hexed = hex::encode(encoder.finish().unwrap());
-            response.body = hexed.as_bytes().to_vec();
+            let body_text = String::from_utf8_lossy(&response.body);
+            _ = encoder.write_all(body_text.as_bytes());
+            response.body = encoder.finish().unwrap();
 
             let content_length = response.body.len();
 
