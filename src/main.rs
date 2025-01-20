@@ -1,9 +1,13 @@
 mod threadpool;
+mod request;
+mod response;
 
 use std::io::{Read, Write};
 #[allow(unused_imports)]
 use std::net::TcpListener;
 use std::net::TcpStream;
+use request::Request;
+use response::Response;
 
 static mut DIRECTORY: &str = "public";
 fn main() {
@@ -33,7 +37,7 @@ fn handle_connection(mut stream: TcpStream) {
     println!("accepted new connection");
     let mut buffer = [0; 1024];
     _ = stream.read(&mut buffer).unwrap();
-    let request = parse_request(&buffer);
+    let request = Request::new(&buffer);
 
     let mut response = match request
         .path_parts
@@ -197,78 +201,5 @@ fn files_get(request: &Request) -> Response {
             headers: vec![],
             body: vec![],
         },
-    }
-}
-
-fn parse_request(buf: &[u8; 1024]) -> Request {
-    let request = String::from_utf8_lossy(buf);
-
-    let request = request
-        .trim()
-        .split("\r\n")
-        .filter(|s| !s.trim().is_empty())
-        .collect::<Vec<&str>>();
-    let request_line = request[0].split(" ").collect::<Vec<&str>>();
-    let method = request_line[0].to_string();
-    let path = request_line[1].to_string();
-    let path_parts = path
-        .split("/")
-        .map(|s| s.to_string())
-        .filter(|s| !s.is_empty())
-        .collect();
-
-    let headers = request[1..]
-        .iter()
-        .filter(|line| line.contains(": "))
-        .map(|line| {
-            let parts = line.split(": ").collect::<Vec<&str>>();
-            (parts[0].to_string(), parts[1].to_string())
-        })
-        .collect();
-
-    let mut body: Vec<_> = request[1..]
-        .iter()
-        .filter(|line| !line.contains(": "))
-        .flat_map(|line| line.as_bytes())
-        .copied()
-        .collect();
-    while body.last() == Some(&0) {
-        body.pop();
-    }
-
-    Request {
-        method,
-        path: path.clone(),
-        path_parts,
-        headers,
-        body,
-    }
-}
-
-struct Request {
-    method: String,
-    path: String,
-    path_parts: Vec<String>,
-    headers: Vec<(String, String)>,
-    body: Vec<u8>,
-}
-
-struct Response {
-    status_code: u16,
-    status_text: String,
-    headers: Vec<(String, String)>,
-    body: Vec<u8>,
-}
-
-impl Response {
-    fn to_bytes(&self) -> Vec<u8> {
-        let mut response = format!("HTTP/1.1 {} {}\r\n", self.status_code, self.status_text);
-        for (key, value) in &self.headers {
-            response.push_str(&format!("{}: {}\r\n", key, value));
-        }
-        response.push_str("\r\n");
-        let mut bytes = response.into_bytes();
-        bytes.extend(&self.body);
-        bytes
     }
 }
