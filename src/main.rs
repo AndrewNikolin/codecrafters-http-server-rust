@@ -18,6 +18,9 @@ fn main() {
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
     let thread_pool = threadpool::ThreadPool::new(5);
 
+    println!("Running on http://127.0.0.1:4221");
+    println!("Test with http://127.0.0.1:4221/user-agent");
+
     for stream in listener.incoming() {
         let stream = stream.unwrap();
         thread_pool.execute(|| {
@@ -120,14 +123,20 @@ fn user_agent(request: &Request) -> Response {
 }
 
 fn echo(request: &Request) -> Response {
-    let content_length = request.path_parts[1].len();
+    let echo = &request.path_parts[1];
+
+    if echo == "echo" {
+        panic!("Infinite loop detected");
+    }
+
+    let content_length = echo.len();
     let content_type_header = ("Content-Type".to_string(), "text/plain".to_string());
     let content_length_header = ("Content-Length".to_string(), content_length.to_string());
     Response {
         status_code: 200,
         status_text: "OK".to_string(),
         headers: vec![content_type_header, content_length_header],
-        body: request.path_parts[1].as_bytes().to_vec(),
+        body: echo.as_bytes().to_vec(),
     }
 }
 
